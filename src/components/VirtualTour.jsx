@@ -244,10 +244,14 @@ const VirtualTour = ({ onTourEnd, startTour }) => {
   const modalRef = useRef(null);
 
   useEffect(() => {
-    // Start tour automatically when component mounts
+    // Start tour automatically with 5 second delay when component mounts
     if (startTour) {
-      setIsTourActive(true);
-      setIsAutoZooming(false); // Disable auto-zoom during tour
+      const tourStartTimer = setTimeout(() => {
+        setIsTourActive(true);
+        setIsAutoZooming(false); // Disable auto-zoom during tour
+      }, 5000); // 5 second delay
+
+      return () => clearTimeout(tourStartTimer);
     }
   }, [startTour]);
 

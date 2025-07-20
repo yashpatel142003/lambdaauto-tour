@@ -1,8 +1,6 @@
-// VirtualTour.js
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import '../styles/VirtualTour.css';
 
-// [Hotspot definitions remain unchanged...]
 const deviceComponents = [
   {
     id: 'display',
@@ -183,54 +181,54 @@ const deviceComponents = [
       </div>
     )
   },
-{
-  id: 'sensors',
-  name: 'Precision Sensors',
-  position: { top: '57%', left: '62%' },
-  details: (
-    <div className="detail-content">
-      <div className="media-container">
-        <video
-          src="/assets/videos/sensors.mp4"
-          controls
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster="/assets/images/sensors-poster.jpg"
-        />
-      </div>
-      <div className="text-content">
-        <h4>Biomechanical Measurement System</h4>
-        <ul>
-          <li>Detects 100g strength changes</li>
-          <li>200Hz sampling rate</li>
-          <li>EMG compatible</li>
-          <li>Real-time force vector analysis</li>
-        </ul>
-        <div className="tech-specs">
-          <div className="tech-item">
-            <h5>Accuracy</h5>
-            <p>±0.5% of reading</p>
-          </div>
-          <div className="tech-item">
-            <h5>Range</h5>
-            <p>0-500N</p>
-          </div>
-          <div className="tech-item">
-            <h5>Response Time</h5>
-            <p>&lt;5ms</p>
+  {
+    id: 'sensors',
+    name: 'Precision Sensors',
+    position: { top: '57%', left: '62%' },
+    details: (
+      <div className="detail-content">
+        <div className="media-container">
+          <video
+            src="/assets/videos/sensors.mp4"
+            controls
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster="/assets/images/sensors-poster.jpg"
+          />
+        </div>
+        <div className="text-content">
+          <h4>Biomechanical Measurement System</h4>
+          <ul>
+            <li>Detects 100g strength changes</li>
+            <li>200Hz sampling rate</li>
+            <li>EMG compatible</li>
+            <li>Real-time force vector analysis</li>
+          </ul>
+          <div className="tech-specs">
+            <div className="tech-item">
+              <h5>Accuracy</h5>
+              <p>±0.5% of reading</p>
+            </div>
+            <div className="tech-item">
+              <h5>Range</h5>
+              <p>0-500N</p>
+            </div>
+            <div className="tech-item">
+              <h5>Response Time</h5>
+              <p>&lt;5ms</p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
+    )
+  }
 ];
+
 const allHotspots = [...deviceComponents];
 
-const VirtualTour = ({ onTourEnd }) => {
+const VirtualTour = ({ onTourEnd, startTour }) => {
   const [activeLabel, setActiveLabel] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -239,12 +237,41 @@ const VirtualTour = ({ onTourEnd }) => {
   const [autoZoomDirection, setAutoZoomDirection] = useState('in');
   const [isTourActive, setIsTourActive] = useState(false);
   const [tourIndex, setTourIndex] = useState(0);
+  const [isAutoZooming, setIsAutoZooming] = useState(true);
 
   const deviceImageRef = useRef(null);
   const deviceViewRef = useRef(null);
   const modalRef = useRef(null);
 
-  const estimateReadingTime = () => {
+  useEffect(() => {
+    // Start tour automatically when component mounts
+    if (startTour) {
+      setIsTourActive(true);
+      setIsAutoZooming(false); // Disable auto-zoom during tour
+    }
+  }, [startTour]);
+
+  useEffect(() => {
+    // Auto-zoom effect only when not in tour mode and auto-zooming is enabled
+    if (!isTourActive && isAutoZooming) {
+      const interval = setInterval(() => {
+        setZoomLevel(prev => {
+          let next = autoZoomDirection === 'in' ? prev + 0.01 : prev - 0.01;
+          if (next >= 1.5) {
+            setAutoZoomDirection('out');
+            next = 1.5;
+          } else if (next <= 1) {
+            setAutoZoomDirection('in');
+            next = 1;
+          }
+          return parseFloat(next.toFixed(2));
+        });
+      }, 100);
+      return () => clearInterval(interval);
+    }
+  }, [autoZoomDirection, isTourActive, isAutoZooming]);
+
+  const estimateReadingTime = useCallback(() => {
     if (!modalRef.current) return 3000;
     const modal = modalRef.current;
     const wordCount = (modal.innerText || '').split(/\s+/).length;
@@ -253,9 +280,9 @@ const VirtualTour = ({ onTourEnd }) => {
       ? (modal.scrollHeight - modal.clientHeight) * 20
       : 0;
     return Math.min(25000, Math.max(5000, readingTime + scrollTime));
-  };
+  }, []);
 
-  const waitForVideoEnd = (element) => {
+  const waitForVideoEnd = useCallback((element) => {
     return new Promise(resolve => {
       if (!element) return resolve();
       const video = element.querySelector('video');
@@ -267,14 +294,19 @@ const VirtualTour = ({ onTourEnd }) => {
           resolve();
         };
         video.addEventListener('ended', onEnd);
-        if (video.paused) video.play().catch(() => resolve());
+        if (video.paused) {
+          video.play().catch(error => {
+            console.warn('Video play failed:', error);
+            resolve();
+          });
+        }
       } else {
         resolve();
       }
     });
-  };
+  }, []);
 
-  const autoScrollModal = () => {
+  const autoScrollModal = useCallback(() => {
     return new Promise(resolve => {
       if (!modalRef.current || modalRef.current.scrollHeight <= modalRef.current.clientHeight)
         return resolve();
@@ -282,7 +314,7 @@ const VirtualTour = ({ onTourEnd }) => {
       const totalScroll = modalRef.current.scrollHeight - modalRef.current.clientHeight;
       const step = 2;
       const interval = setInterval(() => {
-        if (scrolled >= totalScroll) {
+        if (scrolled >= totalScroll || !modalRef.current) {
           clearInterval(interval);
           resolve();
         } else {
@@ -291,52 +323,7 @@ const VirtualTour = ({ onTourEnd }) => {
         }
       }, 20);
     });
-  };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setZoomLevel(prev => {
-        let next = autoZoomDirection === 'in' ? prev + 0.01 : prev - 0.01;
-        if (next >= 1.5) {
-          setAutoZoomDirection('out');
-          next = 1.5;
-        } else if (next <= 1) {
-          setAutoZoomDirection('in');
-          next = 1;
-        }
-        return parseFloat(next.toFixed(2));
-      });
-    }, 100);
-    return () => clearInterval(interval);
-  }, [autoZoomDirection]);
-
-  const handleMouseDown = (e) => {
-    if (zoomLevel > 1) {
-      setIsDragging(true);
-      setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
-    }
-  };
-
-  const handleMouseMove = (e) => {
-    if (isDragging && zoomLevel > 1) {
-      const newX = e.clientX - startPos.x;
-      const newY = e.clientY - startPos.y;
-      const container = deviceViewRef.current;
-      const image = deviceImageRef.current;
-      if (container && image) {
-        const maxX = (image.clientWidth * zoomLevel - container.clientWidth) / 2;
-        const maxY = (image.clientHeight * zoomLevel - container.clientHeight) / 2;
-        setPosition({
-          x: Math.max(-maxX, Math.min(maxX, newX)),
-          y: Math.max(-maxY, Math.min(maxY, newY))
-        });
-      }
-    }
-  };
-
-  const handleMouseUp = () => setIsDragging(false);
-  const handleZoomIn = () => setZoomLevel(prev => Math.min(2, parseFloat((prev + 0.1).toFixed(2))));
-  const handleZoomOut = () => setZoomLevel(prev => Math.max(1, parseFloat((prev - 0.1).toFixed(2))));
+  }, []);
 
   useEffect(() => {
     let tourTimer;
@@ -360,6 +347,7 @@ const VirtualTour = ({ onTourEnd }) => {
               setTourIndex(prev => prev + 1);
             } else {
               setIsTourActive(false);
+              setIsAutoZooming(true); // Re-enable auto-zoom after tour
               if (typeof onTourEnd === 'function') {
                 setTimeout(() => {
                   onTourEnd();
@@ -371,25 +359,63 @@ const VirtualTour = ({ onTourEnd }) => {
       };
       runTourStep();
     }
-    return () => clearTimeout(tourTimer);
-  }, [tourIndex, isTourActive, onTourEnd]);
+    return () => {
+      if (tourTimer) {
+        clearTimeout(tourTimer);
+      }
+    };
+  }, [tourIndex, isTourActive, onTourEnd, waitForVideoEnd, autoScrollModal, estimateReadingTime]);
 
-  const handleStartTour = () => {
-    setIsTourActive(true);
-    setTourIndex(0);
+  const handleMouseDown = (e) => {
+    if (zoomLevel > 1) {
+      setIsDragging(true);
+      setStartPos({ 
+        x: e.clientX - position.x, 
+        y: e.clientY - position.y 
+      });
+    }
   };
 
-  const handlePauseTour = () => setIsTourActive(false);
+  const handleMouseMove = (e) => {
+    if (isDragging && zoomLevel > 1) {
+      const newX = e.clientX - startPos.x;
+      const newY = e.clientY - startPos.y;
+      const container = deviceViewRef.current;
+      const image = deviceImageRef.current;
+      if (container && image) {
+        const maxX = (image.clientWidth * zoomLevel - container.clientWidth) / 2;
+        const maxY = (image.clientHeight * zoomLevel - container.clientHeight) / 2;
+        setPosition({
+          x: Math.max(-maxX, Math.min(maxX, newX)),
+          y: Math.max(-maxY, Math.min(maxY, newY))
+        });
+      }
+    }
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+  
+  const handleZoomIn = () => {
+    setIsAutoZooming(false); // Disable auto-zoom when user manually zooms
+    setZoomLevel(prev => Math.min(2, parseFloat((prev + 0.1).toFixed(2))));
+  };
+  
+  const handleZoomOut = () => {
+    setIsAutoZooming(false); // Disable auto-zoom when user manually zooms
+    setZoomLevel(prev => Math.max(1, parseFloat((prev - 0.1).toFixed(2))));
+  };
+
+  const handleHotspotClick = (hotspotId) => {
+    setActiveLabel(hotspotId === activeLabel ? null : hotspotId);
+    setIsAutoZooming(false); // Disable auto-zoom when user interacts
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <section className="virtual-tour">
       <div className="tour-header">
         <h2>Interactive Virtual Tour</h2>
-        <p className="subtitle">Explore the Lambda device features and benefits</p>
-        <div className="tour-controls">
-          <button className="start-tour-button" onClick={handleStartTour}>Start Guided Tour</button>
-          <button className="pause-tour-button" onClick={handlePauseTour}>Pause Tour</button>
-        </div>
+        <p className="subtitle">Exploring Lambda Therapy Robot Features</p>
       </div>
 
       <div className="zoom-controls">
@@ -429,10 +455,7 @@ const VirtualTour = ({ onTourEnd }) => {
                 transform: `translate(-50%, -50%) scale(${1 / zoomLevel})`,
                 transformOrigin: 'center center'
               }}
-              onClick={() => {
-                setActiveLabel(hotspot.id === activeLabel ? null : hotspot.id);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
+              onClick={() => handleHotspotClick(hotspot.id)}
               aria-label={hotspot.name}
             >
               <span className="marker"></span>

@@ -20,60 +20,49 @@ const ProductExplorer = () => {
   const [selectedPart, setSelectedPart] = useState(null);
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const containerRef = useRef(null);
+  const [startTour, setStartTour] = useState(false);
   const [, setScrollingDown] = useState(false);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const markers = document.querySelectorAll('.part-marker');
     markers.forEach((marker, index) => {
       marker.style.animation = `pulse 2s ${index * 0.2}s 3`;
     });
+    
+    // Start the tour immediately on load
+    setStartTour(true);
+  }, []);
 
+  useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 300) {
-        setShowBackToTop(true);
-      } else {
-        setShowBackToTop(false);
-      }
+      setShowBackToTop(window.scrollY > 300);
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const closePartDetails = () => {
-    setSelectedPart(null);
-  };
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    });
-  };
+  const closePartDetails = () => setSelectedPart(null);
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const handleTourEnd = () => {
     setScrollingDown(true);
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
-    const checkIfScrolledToBottom = setInterval(() => {
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 5;
-      if (scrolledToBottom) {
-        clearInterval(checkIfScrolledToBottom);
+    const check = setInterval(() => {
+      if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 5) {
+        clearInterval(check);
         setTimeout(() => {
           setScrollingDown(false);
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-          setTimeout(() => {
-            const navigateEvent = new CustomEvent('navigate-home');
-            window.dispatchEvent(navigateEvent);
-          }, 1000);
+          scrollToTop();
+          setTimeout(() => window.dispatchEvent(new CustomEvent('navigate-home')), 1000);
         }, 1800);
       }
     }, 300);
   };
 
   return (
-    <div className="product-explorer" ref={containerRef}>
+    <div className="product-explorer fade-in" ref={containerRef}>
       <section className="product-overview">
         <div className="product-header">
           <h2>Lambda Therapy Robot</h2>
@@ -81,24 +70,15 @@ const ProductExplorer = () => {
         </div>
 
         <div className="product-visualization">
-          <VirtualTour onTourEnd={handleTourEnd} />
+          <VirtualTour onTourEnd={handleTourEnd} startTour={startTour} />
 
           <div className="product-info">
             <h3>Advanced Rehabilitation Technology</h3>
             <p>The Lambda system combines robotics, real-time biofeedback, and adaptive algorithms to deliver personalized therapy.</p>
             <div className="info-highlights">
-              <div className="info-item">
-                <span className="info-icon">🏥</span>
-                <span>Clinical Proven</span>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">🧑‍⚕️</span>
-                <span>Therapist Approved</span>
-              </div>
-              <div className="info-item">
-                <span className="info-icon">📈</span>
-                <span>Data Driven</span>
-              </div>
+              <div className="info-item"><span className="info-icon">🏥</span><span>Clinical Proven</span></div>
+              <div className="info-item"><span className="info-icon">🧑‍⚕️</span><span>Therapist Approved</span></div>
+              <div className="info-item"><span className="info-icon">📈</span><span>Data Driven</span></div>
             </div>
           </div>
         </div>
@@ -107,11 +87,14 @@ const ProductExplorer = () => {
       <section className="technical-specs">
         <h2 className="section-title">Technical Specifications</h2>
         <p className="subtitle">Precision engineering for clinical environments</p>
-
         <div className="specs-container">
           <div className="specs-grid">
             {technicalSpecs.map((spec, index) => (
-              <div key={index} className="spec-item">
+              <div 
+                key={index} 
+                className="spec-item"
+                style={{ animationDelay: `${4000 + index * 100}ms` }}
+              >
                 <div className="spec-name">{spec.name}</div>
                 <div className="spec-value">{spec.value}</div>
               </div>
@@ -120,16 +103,8 @@ const ProductExplorer = () => {
         </div>
       </section>
 
-      {selectedPart && (
-        <PartModal part={selectedPart} onClose={closePartDetails} />
-      )}
-
-      {selectedFeature && (
-        <FeaturesModal 
-          feature={selectedFeature} 
-          onClose={() => setSelectedFeature(null)} 
-        />
-      )}
+      {selectedPart && <PartModal part={selectedPart} onClose={closePartDetails} />}
+      {selectedFeature && <FeaturesModal feature={selectedFeature} onClose={() => setSelectedFeature(null)} />}
 
       <button 
         className={`back-to-top ${showBackToTop ? 'visible' : ''}`}

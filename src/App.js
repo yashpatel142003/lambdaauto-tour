@@ -8,10 +8,21 @@ import './styles/App.css';
 function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [selectedPart, setSelectedPart] = useState(null);
+  const [fadeClass, setFadeClass] = useState('fade-in');
+  const [tourTrigger, setTourTrigger] = useState(false);
 
-  const navigateTo = (page) => {
-    setCurrentPage(page);
-    window.scrollTo(0, 0);
+  const navigateTo = (page, options = {}) => {
+    setFadeClass('fade-out');
+    setTimeout(() => {
+      if (page === 'product' && options.startTour) {
+        setTourTrigger(true);
+      } else {
+        setTourTrigger(false);
+      }
+      setCurrentPage(page);
+      window.scrollTo(0, 0);
+      setFadeClass('fade-in');
+    }, 800);
   };
 
   const openPartDetails = (part) => {
@@ -23,10 +34,7 @@ function App() {
   };
 
   useEffect(() => {
-    const handleNavigateHome = () => {
-      navigateTo('home');
-    };
-
+    const handleNavigateHome = () => navigateTo('home');
     window.addEventListener('navigate-home', handleNavigateHome);
     return () => window.removeEventListener('navigate-home', handleNavigateHome);
   }, []);
@@ -34,18 +42,21 @@ function App() {
   return (
     <div className="app">
       <Header navigateTo={navigateTo} currentPage={currentPage} />
-      <main>
-        {currentPage === 'home' ? (
-          <HeroSection navigateTo={navigateTo} />
-        ) : (
-          <ProductExplorer 
-            openPartDetails={openPartDetails} 
-            selectedPart={selectedPart}
-            closePartDetails={closePartDetails}
-          />
-        )}
-      </main>
-      <Footer />
+      <div className={fadeClass}>
+        <main>
+          {currentPage === 'home' ? (
+            <HeroSection navigateTo={navigateTo} />
+          ) : (
+            <ProductExplorer 
+              openPartDetails={openPartDetails} 
+              selectedPart={selectedPart}
+              closePartDetails={closePartDetails}
+              startTourOnLoad={tourTrigger}
+            />
+          )}
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }
